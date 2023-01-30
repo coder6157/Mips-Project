@@ -1,0 +1,287 @@
+#include<stdlib.h>
+#include<string.h>
+#include<stdbool.h>
+#include<stdio.h>
+#include<math.h>
+#include <stdint.h>
+
+struct label{
+    char *name;
+    int value;
+};
+struct label labels[128];
+ uint32_t I = 0x0;
+ uint8_t output[1024];
+ int Rt,Rs,Rd,imme,shamt, currIndex=0, flag = -1, structCount=0;
+ void setThreeReg(char* line){
+    char *mypick,*reg1,*reg2,*reg3;
+    printf("0x%08x\n",I);
+    mypick = strtok(line,"\t");
+    mypick = strtok(NULL,"\t");
+    reg1 = strtok(mypick,",");
+    reg2  = strtok(NULL,",");
+    reg3 = strtok(NULL,",");
+    Rd = atoi(++reg1);
+    Rs = atoi(++reg2);
+    Rt = atoi(++reg3);
+    I = I | (Rt<<16);
+    I = I |(Rs<<21);
+    I = I| (Rd<<11);
+    printf(" 0x%08x\n",I);
+    printf("\n%s",reg1);
+    printf("\n%s",reg2);
+    printf("\n%s",reg3);
+    output[currIndex] = I >> 24;
+    output[currIndex+1] = I >> 16;
+    output[currIndex+2] = I >> 8;
+    output[currIndex+3] = I;
+    currIndex = currIndex + 4;
+
+ }
+
+ void setTwoRegAndImm(char *line){
+    char *mypick,*reg1,*reg2,*reg3;
+    printf("0x%08x\n",I);
+    mypick = strtok(line,"\t");
+    mypick = strtok(NULL,"\t");
+    reg1 = strtok(mypick,",");
+    reg2  = strtok(NULL,",");
+    reg3 = strtok(NULL,",");
+    if(strstr(reg3,"x") !=NULL){
+        imme = (int)strtol(reg3,NULL,0);
+ }
+    else{
+    imme = atoi(reg3);
+    }
+    Rt = atoi(++reg1);
+    Rs = atoi(++reg2);
+    I = I | (Rt<<16);
+    I = I |(Rs<<21);
+    I = I |imme;
+    printf(" 0x%08x\n", I);
+    printf("\n%s",reg1);
+    printf("\n%s",reg2);
+    printf("\n%s",reg3);
+    output[currIndex] = I >> 24;
+    output[currIndex+1] = I >> 16;
+    output[currIndex+2] = I >> 8;
+    output[currIndex+3] = I;
+    currIndex = currIndex + 4;
+ }
+
+ void setRegAndOffset(char *line){
+    char *mypick,*reg1,*reg2,*reg3;
+      printf("0x%08x\n",I);
+    mypick = strtok(line,"\t");
+    mypick = strtok(NULL,"\t");
+    reg1 = strtok(mypick,",");
+    reg2  = strtok(NULL,",");
+    reg2 = strtok(reg2,"(");
+    reg3 = strtok(NULL,"(");
+    int  imme = atoi(reg2);
+    int  Rt = atoi(++reg1);
+    int  Rs = atoi(++reg3);
+    I = I | (Rt<<16);
+    I = I | (Rs<<21);
+    I = I |imme;
+    printf(" 0x%08x\n", I);
+    printf("\n%s",reg1);
+    printf("\n%s",reg2);
+    printf("\n%s",reg3);
+    output[currIndex] = I >> 24;
+    output[currIndex+1] = I >> 16;
+    output[currIndex+2] = I >> 8;
+    output[currIndex+3] = I;
+    currIndex = currIndex + 4;
+ }
+int main()
+{
+  FILE *fp = fopen("multfw1.asm","r");
+    char line[128];
+    char *reg1;
+    char *reg2;
+    char *reg3;
+    unsigned char outputline;
+    char *mypick;
+    if(fp==NULL){
+        printf("Error reading the file");
+        }
+    while(!feof(fp)){
+        fgets(line, sizeof(line),fp);
+        if(strstr(line,"data") != NULL){
+            flag = 0;
+        }
+        else if(strstr(line, "text") != NULL){
+            currIndex = 512;
+            flag = 1;
+        }
+        else if(flag == 0){
+            char *datapick;
+            if(strstr(line,":") != NULL){
+                structCount++;
+                datapick = strtok(line, ":");
+                labels[structCount].name = datapick;
+                 labels[structCount].value = currIndex;
+                datapick = strtok(NULL, "\t");
+
+            }
+            else{
+               datapick = strtok(line,"\t");
+
+            }
+            if(strstr(datapick, "word") != NULL || strstr(datapick, "int") != NULL){
+                    datapick = strtok(NULL, "\t");
+                    while(strstr(datapick,",") !=NULL){
+                    char *value= strtok(datapick,",");
+                    int val = atoi(datapick);
+                    output[currIndex+3] = val;
+                    output[currIndex+2] = val >> 8;
+                    output[currIndex+1] = val >> 16;
+                    output[currIndex] = val >> 24;
+                    currIndex = currIndex + 4;
+                    datapick=strtok(NULL,",");
+                }
+int val1 = atoi(datapick);
+                    output[currIndex+3] = val1;
+                    output[currIndex+2] = val1 >> 8;
+                    output[currIndex+1] = val1 >> 16;
+                    output[currIndex] = val1 >> 24;
+                    currIndex = currIndex + 4;
+
+                }
+                else if (strstr(datapick, "array") != NULL){
+                    datapick = strtok(NULL, "\t");
+                    int val = atoi(datapick);
+                    currIndex = currIndex + val;
+                }
+        }
+        else if(strstr(line, "addi")!= NULL){
+            I = 0;
+            I = I | (8<<26);
+            setTwoRegAndImm(line);
+            }
+        else if(strstr(line, "add")!= NULL){
+            I = 0;
+            I = I | 32;
+            setThreeReg(line);
+            }
+
+        else if(strstr(line, "sub")!= NULL){
+            I = 0;
+            I = I | 34;
+            setThreeReg(line);
+            }
+
+        else if(strstr(line, "sll")!= NULL){
+            I = 0;
+            setTwoRegAndImm(line);
+            }
+
+        else if(strstr(line, "srl")!= NULL){
+            I = 0;
+            I = I | 2;
+            setTwoRegAndImm(line);
+            }
+        else if(strstr(line, "slt")!= NULL){
+            I = 0;
+            I = I | 42;
+            setThreeReg(line);
+            }
+
+        else if(strstr(line, "lui")!= NULL){
+            char *mypick,*reg1,*reg2,*reg3;
+int imme =0;
+            I = 0;
+            I = I | (15<<26);
+            printf("0x%08x\n",I);
+            mypick = strtok(line,"\t");
+            mypick = strtok(NULL,"\t");
+            reg1 = strtok(mypick,",");
+            reg2  = strtok(NULL,",");
+            if(strstr(reg2,"x") !=NULL){
+            imme = (int)strtol(reg3,NULL,0);
+            }
+            else{
+            imme = atoi(reg2);
+            }
+            int  Rt = atoi(++reg1);
+            I = I | (Rt<<16);
+            I = I |imme;
+            printf(" 0x%08x\n", I);
+            printf("\n%s",reg1);
+            printf("\n%s",reg2);
+            printf("\n%s",reg3);
+            output[currIndex] = I >> 24;
+            output[currIndex+1] = I >> 16;
+            output[currIndex+2] = I >> 8;
+            output[currIndex+3] = I;
+            currIndex = currIndex + 4;
+
+            }
+        else if(strstr(line, "ori")!= NULL){
+            I = 0;
+            I = I | (13<<26);
+            setTwoRegAndImm(line);
+            }
+
+        else if(strstr(line, "lw")!= NULL){
+            I = 0;
+            I = I | (35<<26);
+            setRegAndOffset(line);
+            }
+        else if(strstr(line, "sw")!= NULL){
+            I = 0;
+            I = I | (43<<26);
+            setRegAndOffset(line);
+            }
+        else if(strstr(line, "la")!= NULL){
+            char *mypick,*reg1,*reg2,*reg3;
+            I = 0;
+I = I | (15<<26);
+            printf("0x%08x\n",I);
+            mypick = strtok(line,"\t");
+            mypick = strtok(NULL,"\t");
+            reg1 = strtok(mypick,",");
+            reg2  = strtok(NULL,",");
+            int  imme=0, immediate=0;
+            for(int i =1;i<=structCount;i++){
+                if(strcmp(labels[i].name,reg2)==0){
+                   immediate = labels[i].value;
+                }
+            }
+            imme = immediate >> 16;
+            int  Rt = atoi(++reg1);
+            I = I | (Rt<<16);
+            I = I |imme;
+            printf(" 0x%08x\n", I);
+            printf("\n%s",reg1);
+            printf("\n%s",reg2);
+            printf("\n%s",reg3);
+            output[currIndex] = I >> 24;
+            output[currIndex+1] = I >> 16;
+            output[currIndex+2] = I >> 8;
+            output[currIndex+3] = I;
+            currIndex = currIndex + 4;
+            int Rs=Rt;
+
+            //ori
+
+            imme = immediate & 0x0000FFFF;
+            I = I | (13<<26);
+            I = I | (Rt<<16);
+            I = I |(Rs<<21);
+            I = I |imme;
+            printf(" 0x%08x\n", I);
+            printf("\n%s",reg1);
+            printf("\n%s",reg2);
+            printf("\n%s",reg3);
+            output[currIndex] = I >> 24;
+            output[currIndex+1] = I >> 16;
+            output[currIndex+2] = I >> 8;
+            output[currIndex+3] = I;
+            currIndex = currIndex + 4;
+            }
+    }
+    fp = fopen( "ayub.bin" , "wb" );
+    fwrite(output , 1 , sizeof(output) , fp );
+
